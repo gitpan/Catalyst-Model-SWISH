@@ -4,3 +4,9 @@ Revision history for Perl extension Catalyst::Model::SWISH.
 	- original version; created by h2xs 1.23 with options
 		-XA -n Catalyst::Model::SWISH
 
+0.02  20 Feb 2008
+      * patch from Brett @ atomiclearning.com to fix one-off bug in results pager
+      * added Catalyst to Makefile.PL
+      * test explicitly for SWISH::API in tests to avoid failing outright if not installed. 
+
+

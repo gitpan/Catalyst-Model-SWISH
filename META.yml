@@ -1,10 +1,11 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Catalyst-Model-SWISH
-version:      0.01
+version:      0.02
 version_from: lib/Catalyst/Model/SWISH.pm
 installdirs:  site
 requires:
+    Catalyst:                      5.7
     Data::Pageset:                 1.03
     NEXT:                          0.6
     Sort::SQL:                     0.01

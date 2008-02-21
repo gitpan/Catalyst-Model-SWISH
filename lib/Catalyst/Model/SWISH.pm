@@ -1,8 +1,7 @@
-package Catalyst::Model::SWISH;
-
-use base 'Catalyst::Model';
-
 use strict;
+use warnings;
+package Catalyst::Model::SWISH;
+use base 'Catalyst::Model';
 use Carp;
 use SWISH::API::Object;
 use NEXT;
@@ -10,7 +9,7 @@ use Data::Pageset;
 use Time::HiRes;
 use Sort::SQL;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 __PACKAGE__->mk_accessors(qw( swish swish_error context ));
 
@@ -221,7 +220,8 @@ sub search
 
     $opts{query} or croak "query required";
     $opts{page}          ||= 1;
-    $opts{page_size}     ||= $self->config->{page_size};
+    $opts{page_size} = defined($opts{page_size}) ?
+        $opts{page_size} : $self->config->{page_size};
     $opts{pages_per_set} ||= $self->config->{pages_per_set};
 
     my $start_time = [Time::HiRes::gettimeofday()];
@@ -271,7 +271,7 @@ sub search
     while (my $r = $results->next_result)
     {
         push(@r, $r);
-        if ($count++ >= $opts{page_size} && $opts{page_size} != 0)
+        if (++$count >= $opts{page_size} && $opts{page_size} != 0)
         {
             last;
         }
