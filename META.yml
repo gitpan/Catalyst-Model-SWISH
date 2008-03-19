@@ -1,16 +1,19 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Catalyst-Model-SWISH
-version:      0.02
-version_from: lib/Catalyst/Model/SWISH.pm
-installdirs:  site
-requires:
+--- #YAML:1.0
+name:                Catalyst-Model-SWISH
+version:             0.03
+abstract:            Catalyst model for Swish-e
+license:             ~
+author:              
+    - Peter Karman <perl@peknet.com>
+generated_by:        ExtUtils::MakeMaker version 6.42
+distribution_type:   module
+requires:     
     Catalyst:                      5.7
     Data::Pageset:                 1.03
     NEXT:                          0.6
     Sort::SQL:                     0.01
     SWISH::API::Object:            0.09
     Time::HiRes:                   1.86
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3

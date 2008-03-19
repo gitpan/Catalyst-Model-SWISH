@@ -9,4 +9,9 @@ Revision history for Perl extension Catalyst::Model::SWISH.
       * added Catalyst to Makefile.PL
       * test explicitly for SWISH::API in tests to avoid failing outright if not installed. 
 
+0.03  19 Mar 2008
+      * fix new() to test for config hash presence before merging
+      * use Catalyst::Utils::merge_hashes() to do config merging
+
+
 
