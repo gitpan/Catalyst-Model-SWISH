@@ -1,19 +1,19 @@
+package Catalyst::Model::SWISH;
 use strict;
 use warnings;
-
-package Catalyst::Model::SWISH;
-use base 'Catalyst::Model';
+use base qw( Catalyst::Model );
 use Carp;
 use SWISH::API::Object;
-use NEXT;
-use Catalyst::Utils;
+use Data::Dump qw( dump );
+use Class::C3;
 use Data::Pageset;
-use Time::HiRes;
+use Time::HiRes qw( time );
 use Sort::SQL;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-__PACKAGE__->mk_accessors(qw( swish swish_error context ));
+__PACKAGE__->mk_accessors(
+    qw( swish swish_error pages_per_set page_size indexes debug ));
 
 =head1 NAME
 
@@ -24,26 +24,28 @@ Catalyst::Model::SWISH - Catalyst model for Swish-e
  # in your Controller
  sub search : Local
  {
-    my ($self,$c) = @_;
-    my ($pager,$results,$query,$order,$total,$stime,$btime) = 
+    my ($self, $c) = @_;
+    my ($pager, $results, $query, $order, $total, $stime, $btime) = 
      $c->model('SWISH')->search(
-      query         => $c->request->param('q'),
-      page          => $c->request->param('page') || 0,
-      page_size     => $c->request->param('itemsperpage') || 0,
-      limit_to      => 'swishtitle',
-      limit_high    => 'm',
-      limit_low     => 'a',
-      order_by      => 'swishrank desc swishtitle asc'
+        query         => $c->request->params->{q},
+        page          => $c->request->params->{page} || 0,
+        page_size     => $c->request->params->{itemsperpage} || 0,
+        limit_to      => 'swishtitle',
+        limit_high    => 'm',
+        limit_low     => 'a',
+        order_by      => 'swishrank desc swishtitle asc'
      );
-    $c->stash->{search} = {
-                           results  => $results,
-                           pager    => $pager,
-                           query    => $query,
-                           order    => $order,
-                           hits     => $total,
-                           search_time => $stime,
-                           build_time  => $btime
-                          };
+    $c->stash(search => 
+        {
+            results  => $results,
+            pager    => $pager,
+            query    => $query,
+            order    => $order,
+            hits     => $total,
+            search_time => $stime,
+            build_time  => $btime
+        }
+    );
  }
  
 
@@ -99,42 +101,51 @@ Constructor is called automatically by Catalyst at startup.
 
 =cut
 
-sub ACCEPT_CONTEXT {
-    my ( $self, $c, @args ) = @_;
-    my $new = bless( {%$self}, ref $self );
-    $new->context($c);
-    return $new;
-}
+__PACKAGE__->config(
+    pages_per_set => 10,
+    page_size     => 10,
+);
 
 sub new {
     my ( $class, $c ) = @_;
-    my $self   = $class->NEXT::new($c);
-    my %config = (
-        indexes => $self->config->{indexes}
-            || $c->config->{$class}->{indexes}
-            || $c->config->{home} . '/index.swish-e',
-        pages_per_set => $self->config->{pages_per_set} || 10
-    );
+    my $self = $class->next::method($c);
 
-    Catalyst::Utils::merge_hashes( \%config, $self->config ) if $self->config;
-    Catalyst::Utils::merge_hashes( \%config, $c->config->{$class} )
-        if exists $c->config->{$class};
+    # this config merging pointless if the default __PACKAGE__->config()
+    # works above.
 
-    # page_size == 0 is a valid value, so we must use defined()
-    unless ( defined $config{page_size} ) {
-        if ( defined $self->config->{page_size} ) {
-            $config{page_size} = $self->config->{page_size};
-        }
-        elsif ( defined $c->config->{$class}->{page_size} ) {
-            $config{page_size} = $c->config->{$class}->{page_size};
-        }
-        else {
-            $config{page_size} = 10;
-        }
-    }
+    #    my %config = (
+    #        indexes => $self->config->{indexes}
+    #            || $c->config->{$class}->{indexes}
+    #            || $c->config->{home} . '/index.swish-e',
+    #        pages_per_set => $self->config->{pages_per_set} || 10
+    #    );
+    #
+    #    $c->merge_config_hashes( \%config, $self->config ) if $self->config;
+    #    $c->merge_config_hashes( \%config, $c->config->{$class} )
+    #        if exists $c->config->{$class};
+    #
+    #    # page_size == 0 is a valid value, so we must use defined()
+    #    unless ( defined $config{page_size} ) {
+    #        if ( defined $self->config->{page_size} ) {
+    #            $config{page_size} = $self->config->{page_size};
+    #        }
+    #        elsif ( defined $c->config->{$class}->{page_size} ) {
+    #            $config{page_size} = $c->config->{$class}->{page_size};
+    #        }
+    #        else {
+    #            $config{page_size} = 10;
+    #        }
+    #    }
 
-    $self->config( \%config );
-    $self->connect;
+    #    $self->config( \%config );
+
+    $self->{app_class} = ref($c) || $c;    # for logging
+    $self->{indexes} ||= $c->path_to('index.swish-e') . '';    # stringify
+
+    $self->debug
+        and $self->{app_class}
+        ->log->debug( sprintf( "%s: %s", ref($self), dump $self ) );
+
     return $self;
 }
 
@@ -142,7 +153,7 @@ sub new {
 
 Perform a search on the index.
 
-Returns (in order):
+In array context, returns (in order):
 
 =over
 
@@ -178,6 +189,25 @@ the build time
 
 =back
 
+In scalar context, returns a hashref with the same values, with keys:
+
+=over
+
+=item pager
+
+=item results
+
+=item query
+
+=item order
+
+=item hits
+
+=item search_time
+
+=item build_time
+
+=back
 
 I<opts> require a C<query> name/value pair at minimum. Other
 valid params include:
@@ -210,105 +240,184 @@ Low value for C<limit_to>.
 
 sub search {
     my $self = shift;
-    my $c    = $self->context;
     my %opts = @_;
 
     $opts{query} or croak "query required";
-    $opts{page} ||= 1;
-    $opts{page_size}
-        = defined( $opts{page_size} )
-        ? $opts{page_size}
-        : $self->config->{page_size};
-    $opts{pages_per_set} ||= $self->config->{pages_per_set};
 
-    my $start_time = [ Time::HiRes::gettimeofday() ];
-    my $search     = $self->swish->new_search_object;
-    if ( $self->_check_err ) {
-        $c->error( $self->swish_error );
-        return;
+    my ( $swish, $search, $search_time, $build_time, $start_time, $results,
+        $pager, $search_results );
+
+    $search_results = { results => [], hits => 0 };
+
+    $swish = $self->{swish} || $self->connect;
+    $search = $swish->new_search_object;
+    croak( $self->swish_error ) if $self->_check_err;
+    $self->set_search_opts( $search, \%opts );
+    croak( $self->swish_error ) if $self->_check_err;
+
+    $start_time = time();
+    $results    = $search->execute( $opts{query} );
+    croak( $self->swish_error ) if $self->_check_err;
+
+    if ( $self->debug ) {
+        $self->{app_class}->log->debug(
+            sprintf(
+                "%s: query '%s': %d hits",
+                ref($self), $opts{query}, $results->hits
+            )
+        );
+        croak( $self->swish_error ) if $self->_check_err;
     }
 
-    if ( $opts{limit_to} ) {
-        defined $opts{limit_high}
-            or croak "limit_high required with limit_to";
-        defined $opts{limit_low} or croak "limit_low required with limit_to";
+    $search_time = sprintf( '%0.4f', time() - $start_time );
 
-        $search->set_search_limit( $opts{limit_to}, $opts{limit_low},
-            $opts{limit_high} );
+    if ( $results->hits ) {
+        my $start       = ( $opts{page} - 1 ) * $opts{page_size};
+        my $build_start = time();
+        $self->seek_result( $results, $start ) unless $start > $results->hits;
+        croak( $self->swish_error ) if $self->_check_err;
+        $search_results = $self->get_results( $results, \%opts );
+        croak( $self->swish_error ) if $self->_check_err;
+
+        unless ( $opts{page_size} == 0 ) {
+
+            $pager = Data::Pageset->new(
+                {   total_entries    => $search_results->{hits},
+                    entries_per_page => $opts{page_size},
+                    current_page     => $opts{page},
+                    pages_per_set    => $opts{pages_per_set},
+                    mode             => 'slide',
+                }
+            );
+
+        }
+
+        $build_time = sprintf( '%0.4f', time() - $build_start );
+    }
+
+    return wantarray
+        ? (
+        $pager,
+        $search_results->{results},
+        [ $results->parsed_words( $swish->indexes->[0] ) ],
+        Sort::SQL->string2array( $opts{order_by} || 'swishrank desc' ),
+        $search_results->{hits},
+        $search_time,
+        $build_time
+        )
+        : {
+        pager   => $pager,
+        results => $search_results->{results},
+        query   => [ $results->parsed_words( $swish->indexes->[0] ) ],
+        order =>
+            Sort::SQL->string2array( $opts{order_by} || 'swishrank desc' ),
+        hits        => $search_results->{hits},
+        search_time => $search_time,
+        build_time  => $build_time
+        };
+}
+
+=head2 seek_result( I<results_object>, I<start_offset> )
+
+Calls the I<results_object> seek_result() method, setting it to
+I<start_offset>.
+
+=cut
+
+sub seek_result {
+    my ( $self, $results, $start ) = @_;
+    $results->seek_result($start);
+}
+
+=head2 set_search_opts( I<search_object>, I<opts> )
+
+I<search_object> is a SWISH::API::More::Search object.
+
+I<opts> is a hashref. This method is called within search().
+Override it to set per-search options other than the defaults.
+
+=cut
+
+sub set_search_opts {
+    my $self   = shift;
+    my $search = shift or croak "Search object required";
+    my $opts   = shift or croak "opts hashref required";
+
+    $opts->{page} ||= 1;
+    $opts->{page_size}
+        = defined( $opts->{page_size} )
+        ? $opts->{page_size}
+        : $self->config->{page_size};
+    $opts->{pages_per_set} ||= $self->config->{pages_per_set};
+
+    if ( $opts->{limit_to} ) {
+        defined $opts->{limit_high}
+            or croak "limit_high required with limit_to";
+        defined $opts->{limit_low}
+            or croak "limit_low required with limit_to";
+
+        $search->set_search_limit( $opts->{limit_to}, $opts->{limit_low},
+            $opts->{limit_high} );
         if ( $self->_check_err ) {
-            $c->error( $self->swish_error );
+            croak( $self->swish_error );
             return;
         }
     }
-    if ( $opts{order_by} ) {
-        $search->set_sort( $opts{order_by} );
+    if ( $opts->{order_by} ) {
+        $search->set_sort( $opts->{order_by} );
     }
 
-    my $results = $search->execute( $opts{query} );
-    if ( $self->_check_err ) {
-        $c->error( $self->swish_error );
-        return;
-    }
-    my $search_time = sprintf(
-        '%0.4f',
-        Time::HiRes::tv_interval(
-            $start_time, [ Time::HiRes::gettimeofday() ]
-        )
-    );
+    return $opts;
+}
 
+=head2 get_results( I<results_object>, I<opts> )
+
+Loops over I<results_object> calling next_result().
+I<opts> is the same hashref passed to set_search_opts().
+
+Returns a hashref with the following key pairs:
+
+=over
+
+=item hits
+
+Total number of hits for query.
+
+=item count
+
+Total number of results in current search.
+
+=item results
+
+Arrayref of result objects.
+
+=back
+
+=cut
+
+sub get_results {
+    my $self    = shift;
+    my $results = shift or croak "SWISH::API::Object::Results required";
+    my $opts    = shift or croak "search opts hashref required";
+    my $count   = 0;
     my @r;
-    my $start       = ( $opts{page} - 1 ) * $opts{page_size};
-    my $build_start = [ Time::HiRes::gettimeofday() ];
-    $results->seek_result($start) unless $start > $results->hits;
-    my $count = 0;
     while ( my $r = $results->next_result ) {
         push( @r, $r );
-        if ( ++$count >= $opts{page_size} && $opts{page_size} != 0 ) {
+        if ( ++$count >= $opts->{page_size} && $opts->{page_size} != 0 ) {
             last;
         }
     }
-
-    my $pager;
-
-    unless ( $opts{page_size} == 0 ) {
-
-        $pager = Data::Pageset->new(
-            {   total_entries    => $results->Hits,
-                entries_per_page => $opts{page_size},
-                current_page     => $opts{page},
-                pages_per_set    => $opts{pages_per_set},
-                mode             => 'slide',
-            }
-        );
-
-    }
-
-    my $build_time = sprintf(
-        '%0.4f',
-        Time::HiRes::tv_interval(
-            $start_time, [ Time::HiRes::gettimeofday() ]
-        )
-    );
-
-    return (
-        $pager,
-        \@r,
-        [ $results->parsed_words( $self->swish->indexes->[0] ) ],
-        Sort::SQL->string2array( $opts{order_by} || 'swishrank desc' ),
-        $results->hits,
-        $search_time,
-        $build_time
-    );
+    return { hits => $results->Hits, count => $count, results => \@r };
 }
 
 sub _check_err {
     my $self = shift;
 
-    if ( $self->swish->error ) {
+    if ( $self->{swish}->error ) {
         $self->swish_error(
                   ref($self) . ": "
-                . $self->swish->error_string . ": "
-                . $self->swish->last_error_msg );
+                . $self->{swish}->error_string . ": "
+                . $self->{swish}->last_error_msg );
         return 1;
     }
     return 0;
@@ -322,19 +431,26 @@ it, essentially re-opening the Swish-e index.
 B<NOTE:> SWISH::API::Object actually makes this unnecessary in most cases,
 since it inherits from SWISH::API::Stat.
 
+Returns the SWISH::API::Object instance.
+
 =cut
 
 sub connect {
     my $self = shift;
-    $self->{swish} = SWISH::API::Object->new( %{ $self->config } );
+    $self->{swish} = SWISH::API::Object->new(
+        indexes => $self->indexes,
+        debug   => $self->debug
+    );
     croak $self->swish_error if $self->_check_err;
 
     # use RankScheme 1 if the index supports it
-    my $rs = $self->swish->header_value( $self->swish->indexes->[0],
+    my $rs = $self->{swish}->header_value( $self->{swish}->indexes->[0],
         'IgnoreTotalWordCountWhenRanking' );
     if ( !$rs ) {
-        $self->swish->rank_scheme(1);
+        $self->{swish}->rank_scheme(1);
     }
+
+    return $self->{swish};
 }
 
 1;

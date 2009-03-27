@@ -13,5 +13,8 @@ Revision history for Perl extension Catalyst::Model::SWISH.
       * fix new() to test for config hash presence before merging
       * use Catalyst::Utils::merge_hashes() to do config merging
 
-
+0.04  27 Mar 2009
+      * add real tests
+      * fix bug when used in prefork conditions, where all children share same index handle.
+      * refactor to not need $c
 
