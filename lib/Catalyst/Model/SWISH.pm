@@ -5,12 +5,13 @@ use base qw( Catalyst::Model );
 use Carp;
 use SWISH::API::Object;
 use Data::Dump qw( dump );
-use Class::C3;
+use MRO::Compat;
+use mro 'c3';
 use Data::Pageset;
 use Time::HiRes qw( time );
 use Sort::SQL;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 __PACKAGE__->mk_accessors(
     qw( swish swish_error pages_per_set page_size indexes debug ));

@@ -18,3 +18,6 @@ Revision history for Perl extension Catalyst::Model::SWISH.
       * fix bug when used in prefork conditions, where all children share same index handle.
       * refactor to not need $c
 
+0.05  29 Jan 2010
+      * fix deps per RT54097
+

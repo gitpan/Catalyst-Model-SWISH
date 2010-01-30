@@ -6,12 +6,13 @@ WriteMakefile(
    
         'Catalyst::Runtime'     => 5.7, 
         'SWISH::API::Object'    => 0.09,
-        'Class::C3'             => 0,
+        'MRO::Compat'           => 0,
         'Time::HiRes'           => 1.86,
         'Data::Pageset'         => 1.03,
         'Sort::SQL'             => 0.03,
         
         # for tests
+        'Catalyst::Action::RenderView' => 0,
         'Catalyst::View::TT' => 0,
         'Template::Plugin::Handy' => 0,
         'Catalyst::Plugin::ConfigLoader' => 0,
