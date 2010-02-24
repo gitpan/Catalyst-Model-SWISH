@@ -11,7 +11,7 @@ use Data::Pageset;
 use Time::HiRes qw( time );
 use Sort::SQL;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 __PACKAGE__->mk_accessors(
     qw( swish swish_error pages_per_set page_size indexes debug ));

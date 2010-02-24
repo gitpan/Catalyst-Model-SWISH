@@ -21,3 +21,6 @@ Revision history for Perl extension Catalyst::Model::SWISH.
 0.05  29 Jan 2010
       * fix deps per RT54097
 
+0.06  24 Feb 2010
+      * fix checks for SWISH::API and SWISH::API::Object to skip if not installed.
+

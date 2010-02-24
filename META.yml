@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Catalyst-Model-SWISH
-version:            0.05
+version:            0.06
 abstract:           Catalyst model for Swish-e
 author:
     - Peter Karman <perl@peknet.com>
